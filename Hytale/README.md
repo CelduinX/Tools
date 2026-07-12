@@ -5,8 +5,8 @@ Mit diesem PowerShell-Einzeiler werden die deutschen Sprachdateien für Hytale a
 ## Installation
 
 1. Hytale vollständig schließen.
-2. PowerShell öffnen. Administratorrechte sind normalerweise nicht erforderlich.
-3. Den folgenden Befehl vollständig kopieren, in PowerShell einfügen und mit `Enter` ausführen:
+2. Mit der rechten Maustaste auf das Windows-Startmenü klicken und **Terminal (Administrator)** auswählen.
+3. Den folgenden Befehl vollständig kopieren, in das Terminal einfügen und mit `Enter` ausführen:
 
 ```powershell
 irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1|iex
