@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Set this to skip the interactive prompt, for example:
-# DOCKER_BASE_DIR="/opt/docker"
-DOCKER_BASE_DIR="${DOCKER_BASE_DIR:-}"
+# Override this when a different base directory is required.
+DOCKER_BASE_DIR="${DOCKER_BASE_DIR:-/opt/docker}"
 
 # Set DRY_RUN=1 to print actions without changing the system.
 DRY_RUN="${DRY_RUN:-0}"
@@ -86,11 +85,6 @@ require_ubuntu() {
 }
 
 choose_base_dir() {
-  if [[ -z "$DOCKER_BASE_DIR" ]]; then
-    read -r -p "Docker target directory [/opt/docker]: " DOCKER_BASE_DIR
-    DOCKER_BASE_DIR="${DOCKER_BASE_DIR:-/opt/docker}"
-  fi
-
   [[ "$DOCKER_BASE_DIR" = /* ]] || die "DOCKER_BASE_DIR must be an absolute path."
   [[ "$DOCKER_BASE_DIR" != "/" ]] || die "DOCKER_BASE_DIR must not be /."
   [[ "$DOCKER_BASE_DIR" != "/var/lib/docker" ]] || die "Choose a parent directory, not /var/lib/docker."

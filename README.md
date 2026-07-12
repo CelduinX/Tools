@@ -25,7 +25,7 @@ irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1|iex
 **Ubuntu Server** · Aktualisiert das System und richtet Docker automatisch ein.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CelduinX/Tools/refs/heads/main/Docker/setup-ubuntu-docker.sh | sudo DOCKER_BASE_DIR=/opt/docker bash
+curl -fsSL https://github.com/CelduinX/Tools/raw/main/Docker/install.sh|sudo bash
 ```
 
-📄 [Skript ansehen](Docker/setup-ubuntu-docker.sh)
+📄 [Skript ansehen](Docker/install.sh)
