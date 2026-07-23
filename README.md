@@ -29,3 +29,13 @@ curl -fsSL https://github.com/CelduinX/Tools/raw/main/Docker/install.sh|sudo bas
 ```
 
 📄 [Skript ansehen](Docker/install.sh)
+
+---
+
+## 🖥️ PC-Prüfprotokoll
+
+**Windows 10/11** · Prüft Hardware, Windows, Sicherheit, Datenträger und Netzwerk und erstellt ein professionelles, druckbares Prüfprotokoll.
+
+Durchgeführte Tätigkeiten können beim Start eingegeben werden und erscheinen anschließend als Stichpunktliste im Bericht.
+
+📖 [Download und Anleitung](PC-Pruefprotokoll/README.md)
