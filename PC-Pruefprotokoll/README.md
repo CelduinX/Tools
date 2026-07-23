@@ -41,6 +41,9 @@ PC-Pruefprotokoll_<Computername>_<Datum_Uhrzeit>\
 
 - Der übliche Prüflauf dauert je nach Windows-Update-Suche und Internetverbindung etwa 3–8 Minuten.
 - Für die Verbindungstests werden `cloudflare.com` und der öffentliche Cloudflare-DNS-Server `1.1.1.1` verwendet.
+- Windows-Name, Feature-Version und vollständige Buildnummer werden aus Betriebssystem- und Registrierungsdaten abgeglichen, damit insbesondere Windows 11 korrekt bezeichnet wird.
+- Verfügbare Temperaturwerte werden aus Windows-ACPI, Datenträger-SMART und bereits vorhandenen Hardware-Monitoring-Anbietern gelesen. Nicht jeder PC stellt solche Sensoren über Windows bereit.
+- Prozessor- und Grafiktemperaturen werden ab 85 °C als Warnung und ab 95 °C als Fehler bewertet. Für Datenträger gelten 55 °C beziehungsweise 65 °C, für allgemeine ACPI-Systemsensoren 80 °C beziehungsweise 90 °C.
 - Der Bericht enthält Geräte-, Serien-, MAC- und IP-Daten, jedoch keine Produktschlüssel, Kennwörter oder WLAN-Schlüssel.
 - Die eingegebenen Tätigkeiten erscheinen als Stichpunktliste im HTML-Bericht und werden zusätzlich in den JSON-Rohdaten gespeichert.
 - Die Druckansicht ist für A4 im Hochformat optimiert; breite Datenträger- und Netzwerktabellen werden dabei automatisch in gut lesbare Detailblöcke umgewandelt.
