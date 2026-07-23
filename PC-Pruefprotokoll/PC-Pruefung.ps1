@@ -131,6 +131,96 @@ function Get-PropertyValue {
     return $property.Value
 }
 
+function Get-WindowsVersionDetails {
+    param($OperatingSystem)
+
+    $currentVersion = $null
+    try {
+        $currentVersion = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
+    }
+    catch { }
+
+    $caption = [string](Get-PropertyValue $OperatingSystem 'Caption' '')
+    $registryProductName = [string](Get-PropertyValue $currentVersion 'ProductName' '')
+    $buildText = [string](Get-PropertyValue $currentVersion 'CurrentBuild' (Get-PropertyValue $OperatingSystem 'BuildNumber' ''))
+    $buildNumber = 0
+    [void][int]::TryParse($buildText, [ref]$buildNumber)
+    $installationType = [string](Get-PropertyValue $currentVersion 'InstallationType' '')
+
+    $windowsName = if (-not [string]::IsNullOrWhiteSpace($caption)) { $caption.Trim() } else { $registryProductName.Trim() }
+    $isClient = [string]::IsNullOrWhiteSpace($installationType) -or $installationType -eq 'Client'
+    if ($isClient -and $buildNumber -ge 22000) {
+        if ([string]::IsNullOrWhiteSpace($windowsName)) {
+            $windowsName = 'Microsoft Windows 11'
+        }
+        elseif ($windowsName -match 'Windows 10') {
+            $windowsName = $windowsName -replace 'Windows 10', 'Windows 11'
+        }
+    }
+    elseif ($isClient -and $buildNumber -ge 10240 -and [string]::IsNullOrWhiteSpace($windowsName)) {
+        $windowsName = 'Microsoft Windows 10'
+    }
+    if ([string]::IsNullOrWhiteSpace($windowsName)) {
+        $windowsName = 'Nicht verfügbar'
+    }
+
+    $displayVersion = [string](Get-PropertyValue $currentVersion 'DisplayVersion' (Get-PropertyValue $currentVersion 'ReleaseId' ''))
+    if ([string]::IsNullOrWhiteSpace($displayVersion)) {
+        $displayVersion = 'Nicht verfügbar'
+    }
+
+    $ubr = Get-PropertyValue $currentVersion 'UBR'
+    $fullBuild = if (-not [string]::IsNullOrWhiteSpace($buildText)) {
+        if ($null -ne $ubr -and ([string]$ubr) -match '^\d+$') { '{0}.{1}' -f $buildText, $ubr } else { $buildText }
+    }
+    else {
+        'Nicht verfügbar'
+    }
+
+    return [pscustomobject]@{
+        Windows = $windowsName
+        FeatureVersion = $displayVersion
+        Systemversion = (Get-PropertyValue $OperatingSystem 'Version' 'Nicht verfügbar')
+        Build = $fullBuild
+    }
+}
+
+function Get-TemperatureRating {
+    param(
+        [double]$Temperature,
+        [ValidateSet('Prozessor', 'Grafik', 'Datenträger', 'System')]
+        [string]$Type = 'System'
+    )
+
+    $warningLimit = switch ($Type) {
+        'Datenträger' { 55 }
+        'System' { 80 }
+        default { 85 }
+    }
+    $errorLimit = switch ($Type) {
+        'Datenträger' { 65 }
+        'System' { 90 }
+        default { 95 }
+    }
+
+    if ($Temperature -ge $errorLimit) { return 'Fehler' }
+    if ($Temperature -ge $warningLimit) { return 'Warnung' }
+    return 'Bestanden'
+}
+
+function Get-ValidTemperature {
+    param($Value)
+    if ($null -eq $Value) { return $null }
+    try {
+        $temperature = [double]$Value
+        if ($temperature -gt 0 -and $temperature -le 150) {
+            return [math]::Round($temperature, 1)
+        }
+    }
+    catch { }
+    return $null
+}
+
 function Get-SafeFileName {
     param([string]$Value)
     $invalid = [IO.Path]::GetInvalidFileNameChars()
@@ -148,7 +238,8 @@ function Get-DocumentedActivities {
         try {
             $decodedBytes = [Convert]::FromBase64String($ActivitiesEncoded)
             $decodedJson = [Text.Encoding]::UTF8.GetString($decodedBytes)
-            foreach ($activity in @($decodedJson | ConvertFrom-Json)) {
+            $decodedActivities = $decodedJson | ConvertFrom-Json
+            foreach ($activity in $decodedActivities) {
                 if (-not [string]::IsNullOrWhiteSpace([string]$activity)) {
                     $items.Add(([string]$activity).Trim())
                 }
@@ -311,14 +402,16 @@ try {
     $bios = Get-CimInstance -ClassName Win32_BIOS
     $installDate = Convert-WmiDate (Get-PropertyValue $os 'InstallDate')
     $lastBoot = Convert-WmiDate (Get-PropertyValue $os 'LastBootUpTime')
+    $windowsVersion = Get-WindowsVersionDetails $os
     $systemDetails = [ordered]@{
         Computername = $computerName
         Hersteller = (Get-PropertyValue $computer 'Manufacturer' 'Nicht verfügbar')
         Modell = (Get-PropertyValue $computer 'Model' 'Nicht verfügbar')
         Seriennummer = (Get-PropertyValue $bios 'SerialNumber' 'Nicht verfügbar')
-        Windows = (Get-PropertyValue $os 'Caption' 'Nicht verfügbar')
-        Version = (Get-PropertyValue $os 'Version' 'Nicht verfügbar')
-        Build = (Get-PropertyValue $os 'BuildNumber' 'Nicht verfügbar')
+        Windows = $windowsVersion.Windows
+        Windows_Version = $windowsVersion.FeatureVersion
+        Build = $windowsVersion.Build
+        Systemversion = $windowsVersion.Systemversion
         Architektur = (Get-PropertyValue $os 'OSArchitecture' 'Nicht verfügbar')
         Installiert_am = $installDate
         Letzter_Systemstart = $lastBoot
@@ -454,6 +547,91 @@ catch {
     Add-Check 'Hardware' 'Prozessor und Arbeitsspeicher' 'Nicht verfügbar' 'CPU- oder Arbeitsspeicherdaten konnten nicht vollständig gelesen werden.'
 }
 
+try {
+    $temperatureDetails = New-Object 'System.Collections.Generic.List[object]'
+    $temperatureWeights = @{ 'Bestanden' = 1; 'Warnung' = 2; 'Fehler' = 3 }
+    $temperatureStatus = 'Bestanden'
+
+    try {
+        $acpiSensors = @(Get-CimInstance -Namespace 'root/wmi' -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop)
+        foreach ($sensor in $acpiSensors) {
+            $rawTemperature = [double](Get-PropertyValue $sensor 'CurrentTemperature' 0)
+            $temperature = Get-ValidTemperature (($rawTemperature / 10) - 273.15)
+            if ($null -eq $temperature) { continue }
+            $rating = Get-TemperatureRating -Temperature $temperature -Type 'System'
+            if ($temperatureWeights[$rating] -gt $temperatureWeights[$temperatureStatus]) {
+                $temperatureStatus = $rating
+            }
+            $temperatureDetails.Add([pscustomobject]@{
+                Sensor = (Get-PropertyValue $sensor 'InstanceName' 'ACPI-Thermalzone')
+                Typ = 'System'
+                Quelle = 'Windows ACPI'
+                Temperatur_C = $temperature
+                Bewertung = $rating
+            })
+        }
+    }
+    catch { }
+
+    foreach ($provider in @(
+        [pscustomobject]@{ Namespace = 'root/OpenHardwareMonitor'; Name = 'Open Hardware Monitor' },
+        [pscustomobject]@{ Namespace = 'root/LibreHardwareMonitor'; Name = 'LibreHardwareMonitor' }
+    )) {
+        try {
+            $providerSensors = @(Get-CimInstance -Namespace $provider.Namespace -ClassName Sensor -ErrorAction Stop |
+                Where-Object { [string](Get-PropertyValue $_ 'SensorType' '') -eq 'Temperature' })
+            foreach ($sensor in $providerSensors) {
+                $temperature = Get-ValidTemperature (Get-PropertyValue $sensor 'Value')
+                if ($null -eq $temperature) { continue }
+                $sensorName = [string](Get-PropertyValue $sensor 'Name' 'Temperatursensor')
+                $sensorIdentifier = [string](Get-PropertyValue $sensor 'Identifier' '')
+                $sensorText = '{0} {1}' -f $sensorName, $sensorIdentifier
+                $sensorType = if ($sensorText -match '(?i)cpu|processor|package|core') {
+                    'Prozessor'
+                }
+                elseif ($sensorText -match '(?i)gpu|graphics') {
+                    'Grafik'
+                }
+                elseif ($sensorText -match '(?i)drive|disk|ssd|hdd|nvme') {
+                    'Datenträger'
+                }
+                else {
+                    'System'
+                }
+                $rating = Get-TemperatureRating -Temperature $temperature -Type $sensorType
+                if ($temperatureWeights[$rating] -gt $temperatureWeights[$temperatureStatus]) {
+                    $temperatureStatus = $rating
+                }
+                $temperatureDetails.Add([pscustomobject]@{
+                    Sensor = $sensorName
+                    Typ = $sensorType
+                    Quelle = $provider.Name
+                    Temperatur_C = $temperature
+                    Bewertung = $rating
+                })
+            }
+        }
+        catch { }
+    }
+
+    if ($temperatureDetails.Count -eq 0) {
+        Add-Check 'Hardware' 'Temperaturen' 'Nicht verfügbar' 'Windows oder die installierten Hardwaretreiber stellen keine auslesbaren Temperatursensoren bereit.'
+    }
+    elseif ($temperatureStatus -eq 'Fehler') {
+        Add-Check 'Hardware' 'Temperaturen' 'Fehler' 'Mindestens ein Temperatursensor meldet einen kritischen Wert.' $temperatureDetails.ToArray()
+    }
+    elseif ($temperatureStatus -eq 'Warnung') {
+        Add-Check 'Hardware' 'Temperaturen' 'Warnung' 'Mindestens ein Temperatursensor meldet einen erhöhten Wert.' $temperatureDetails.ToArray()
+    }
+    else {
+        Add-Check 'Hardware' 'Temperaturen' 'Bestanden' 'Alle verfügbaren Temperatursensoren melden unauffällige Werte.' $temperatureDetails.ToArray()
+    }
+}
+catch {
+    Add-CollectionError 'Temperaturen' $_
+    Add-Check 'Hardware' 'Temperaturen' 'Nicht verfügbar' 'Temperaturwerte konnten nicht zuverlässig ausgewertet werden.'
+}
+
 # 4. Akku
 $step++
 Write-Step $step $totalSteps 'Akkuzustand prüfen'
@@ -513,33 +691,69 @@ try {
             Add-Check 'Datenträger' 'Physische Datenträger' 'Nicht verfügbar' 'Windows hat keine physischen Datenträgerdaten bereitgestellt.'
         }
         else {
-            $diskDetails = @($physicalDisks | ForEach-Object {
+            $diskDetails = @()
+            $diskTemperatureStatus = 'Bestanden'
+            $diskTemperatureAvailable = $false
+            foreach ($disk in $physicalDisks) {
                 $reliability = $null
-                try { $reliability = $_ | Get-StorageReliabilityCounter -ErrorAction Stop }
+                try { $reliability = $disk | Get-StorageReliabilityCounter -ErrorAction Stop }
                 catch { }
-                [pscustomobject]@{
-                    Bezeichnung = $_.FriendlyName
-                    Seriennummer = ([string]$_.SerialNumber).Trim()
-                    Medientyp = $_.MediaType
-                    Bus = $_.BusType
-                    Kapazität = (Convert-Bytes ([double]$_.Size))
-                    Gesundheit = $_.HealthStatus
-                    Betriebsstatus = (@($_.OperationalStatus) -join ', ')
-                    Temperatur_C = (Get-PropertyValue $reliability 'Temperature')
-                    Betriebsstunden = (Get-PropertyValue $reliability 'PowerOnHours')
-                    Lesefehler = (Get-PropertyValue $reliability 'ReadErrorsTotal')
-                    Schreibfehler = (Get-PropertyValue $reliability 'WriteErrorsTotal')
+                $diskTemperature = Get-ValidTemperature (Get-PropertyValue $reliability 'Temperature')
+                $diskTemperatureRating = if ($null -ne $diskTemperature) {
+                    $diskTemperatureAvailable = $true
+                    Get-TemperatureRating -Temperature $diskTemperature -Type 'Datenträger'
                 }
-            })
+                else {
+                    'Nicht verfügbar'
+                }
+                if ($diskTemperatureRating -eq 'Fehler') {
+                    $diskTemperatureStatus = 'Fehler'
+                }
+                elseif ($diskTemperatureRating -eq 'Warnung' -and $diskTemperatureStatus -ne 'Fehler') {
+                    $diskTemperatureStatus = 'Warnung'
+                }
+                $diskDetail = [ordered]@{
+                    Bezeichnung = $disk.FriendlyName
+                    Seriennummer = ([string]$disk.SerialNumber).Trim()
+                    Medientyp = $disk.MediaType
+                    Bus = $disk.BusType
+                    Kapazität = (Convert-Bytes ([double]$disk.Size))
+                    Gesundheit = $disk.HealthStatus
+                    Betriebsstatus = (@($disk.OperationalStatus) -join ', ')
+                }
+                if ($null -ne $diskTemperature) {
+                    $diskDetail.Temperatur_C = $diskTemperature
+                    $diskDetail.Temperaturstatus = $diskTemperatureRating
+                }
+                $powerOnHours = Get-PropertyValue $reliability 'PowerOnHours'
+                $readErrors = Get-PropertyValue $reliability 'ReadErrorsTotal'
+                $writeErrors = Get-PropertyValue $reliability 'WriteErrorsTotal'
+                if ($null -ne $powerOnHours) { $diskDetail.Betriebsstunden = $powerOnHours }
+                if ($null -ne $readErrors) { $diskDetail.Lesefehler = $readErrors }
+                if ($null -ne $writeErrors) { $diskDetail.Schreibfehler = $writeErrors }
+                $diskDetails += [pscustomobject]$diskDetail
+            }
             $unhealthy = @($physicalDisks | Where-Object { [string]$_.HealthStatus -notin @('Healthy', 'Unknown') })
             if ($unhealthy.Count -gt 0) {
                 Add-Check 'Datenträger' 'Physische Datenträger' 'Fehler' ('{0} Datenträger melden einen fehlerhaften Zustand.' -f $unhealthy.Count) $diskDetails
+            }
+            elseif ($diskTemperatureStatus -eq 'Fehler') {
+                Add-Check 'Datenträger' 'Physische Datenträger' 'Fehler' 'Mindestens ein Datenträger meldet eine kritische Temperatur ab 65 °C.' $diskDetails
+            }
+            elseif ($diskTemperatureStatus -eq 'Warnung') {
+                Add-Check 'Datenträger' 'Physische Datenträger' 'Warnung' 'Mindestens ein Datenträger meldet eine erhöhte Temperatur ab 55 °C.' $diskDetails
             }
             elseif (@($physicalDisks | Where-Object { [string]$_.HealthStatus -eq 'Unknown' }).Count -gt 0) {
                 Add-Check 'Datenträger' 'Physische Datenträger' 'Nicht verfügbar' 'Mindestens ein Datenträger stellt keinen verlässlichen Gesundheitsstatus bereit.' $diskDetails
             }
             else {
-                Add-Check 'Datenträger' 'Physische Datenträger' 'Bestanden' 'Alle gemeldeten physischen Datenträger haben den Zustand „Healthy“. ' $diskDetails
+                $diskSummary = if ($diskTemperatureAvailable) {
+                    'Alle Datenträger melden einen unauffälligen Zustand und unkritische Temperaturen.'
+                }
+                else {
+                    'Alle Datenträger melden einen unauffälligen Zustand; Temperaturwerte wurden nicht bereitgestellt.'
+                }
+                Add-Check 'Datenträger' 'Physische Datenträger' 'Bestanden' $diskSummary $diskDetails
             }
         }
     }
@@ -976,35 +1190,37 @@ $html = @"
     }
     .page {
       max-width: 1120px;
-      margin: 28px auto;
+      margin: 18px auto;
       background: white;
       box-shadow: 0 8px 28px rgba(19, 33, 50, .12);
     }
     .hero {
-      padding: 36px 42px 30px;
-      color: white;
-      background: linear-gradient(125deg, #123d63, #1c6593);
+      padding: 22px 34px 16px;
+      color: var(--ink);
+      background: white;
+      border-bottom: 3px solid var(--brand);
     }
     .eyebrow {
-      margin: 0 0 8px;
+      margin: 0 0 4px;
       text-transform: uppercase;
       letter-spacing: .12em;
-      font-size: 12px;
-      opacity: .85;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 650;
     }
-    h1 { margin: 0; font-size: 32px; font-weight: 650; }
-    .hero-subtitle { margin: 8px 0 0; opacity: .9; }
-    main { padding: 30px 42px 42px; }
+    h1 { margin: 0; font-size: 28px; font-weight: 650; }
+    .hero-subtitle { margin: 4px 0 0; color: var(--muted); }
+    main { padding: 20px 34px 28px; }
     .overview {
       display: grid;
       grid-template-columns: 1.35fr 2fr;
-      gap: 20px;
-      margin-bottom: 28px;
+      gap: 12px;
+      margin-bottom: 14px;
     }
     .overall, .meta, .legend, .notice {
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 20px;
+      border-radius: 8px;
+      padding: 14px;
       background: var(--panel);
     }
     .overall { border-left: 6px solid currentColor; }
@@ -1012,16 +1228,16 @@ $html = @"
     .overall.warning { color: var(--warning); background: var(--warning-bg); }
     .overall.failed { color: var(--failed); background: var(--failed-bg); }
     .overall.unavailable { color: var(--unavailable); background: var(--unavailable-bg); }
-    .overall-label { margin: 0 0 6px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-    .overall-value { margin: 0; font-size: 26px; font-weight: 700; }
-    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
-    .metric { border-radius: 7px; padding: 10px; background: rgba(255,255,255,.72); text-align: center; }
-    .metric strong { display: block; font-size: 20px; }
-    .metric span { color: var(--muted); font-size: 11px; }
-    .meta dl { display: grid; grid-template-columns: 150px 1fr; margin: 0; gap: 8px 16px; }
+    .overall-label { margin: 0 0 3px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .overall-value { margin: 0; font-size: 22px; font-weight: 700; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+    .metric { border-radius: 6px; padding: 6px; background: rgba(255,255,255,.72); text-align: center; }
+    .metric strong { display: block; font-size: 17px; }
+    .metric span { color: var(--muted); font-size: 10px; }
+    .meta dl { display: grid; grid-template-columns: 140px 1fr; margin: 0; gap: 5px 12px; }
     .meta dt { color: var(--muted); }
     .meta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-    .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 28px; padding: 14px 18px; background: white; }
+    .legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin-bottom: 14px; padding: 9px 12px; background: white; }
     .legend-item { display: flex; align-items: center; gap: 7px; color: var(--muted); }
     .dot { width: 10px; height: 10px; border-radius: 50%; }
     .dot.passed { background: var(--passed); }
@@ -1029,19 +1245,19 @@ $html = @"
     .dot.failed { background: var(--failed); }
     .dot.unavailable { background: var(--unavailable); }
     .activities-block {
-      margin: 0 0 28px;
+      margin: 0 0 14px;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 18px 20px;
+      border-radius: 8px;
+      padding: 11px 14px;
       background: #f8fafc;
     }
-    .activities-block h2 { margin: 0 0 10px; font-size: 18px; color: var(--brand); }
+    .activities-block h2 { margin: 0 0 6px; font-size: 16px; color: var(--brand); }
     .activities-list { margin: 0; padding-left: 22px; }
-    .activities-list li { margin: 5px 0; padding-left: 3px; }
+    .activities-list li { margin: 3px 0; padding-left: 3px; }
     .activities-empty { margin: 0; color: var(--muted); font-style: italic; }
-    .report-section { margin-top: 30px; }
-    .report-section > h2 { margin: 0 0 12px; padding-bottom: 7px; border-bottom: 2px solid var(--brand); font-size: 20px; }
-    .check-card { margin: 0 0 14px; border: 1px solid var(--line); border-left: 5px solid var(--unavailable); border-radius: 8px; padding: 16px 18px; break-inside: avoid; }
+    .report-section { margin-top: 18px; }
+    .report-section > h2 { margin: 0 0 7px; padding-bottom: 4px; border-bottom: 2px solid var(--brand); font-size: 18px; }
+    .check-card { margin: 0 0 8px; border: 1px solid var(--line); border-left: 4px solid var(--unavailable); border-radius: 6px; padding: 10px 12px; break-inside: avoid; }
     .check-card.passed { border-left-color: var(--passed); }
     .check-card.warning { border-left-color: var(--warning); }
     .check-card.failed { border-left-color: var(--failed); }
@@ -1052,109 +1268,128 @@ $html = @"
     .status-badge.warning { color: var(--warning); background: var(--warning-bg); }
     .status-badge.failed { color: var(--failed); background: var(--failed-bg); }
     .status-badge.unavailable { color: var(--unavailable); background: var(--unavailable-bg); }
-    .summary { margin: 8px 0 0; color: var(--muted); }
-    .table-wrap { overflow-x: auto; margin-top: 13px; }
+    .summary { margin: 4px 0 0; color: var(--muted); }
+    .table-wrap { overflow-x: auto; margin-top: 7px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     table.key-value th:first-child, table.key-value td:first-child { width: 32%; }
     th { color: #334155; background: #f1f4f7; text-align: left; font-weight: 650; }
-    th, td { border: 1px solid var(--line); padding: 7px 8px; vertical-align: top; overflow-wrap: anywhere; }
+    th, td { border: 1px solid var(--line); padding: 5px 6px; vertical-align: top; overflow-wrap: anywhere; }
     tr:nth-child(even) td { background: #fafbfc; }
-    .notice { margin-top: 32px; color: var(--muted); font-size: 12px; }
+    .notice { margin-top: 16px; color: var(--muted); font-size: 12px; }
     .notice strong { color: var(--ink); }
-    footer { padding: 18px 42px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; }
+    footer { padding: 10px 34px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; }
     @media (max-width: 760px) {
       .overview { grid-template-columns: 1fr; }
       .metric-grid { grid-template-columns: repeat(2, 1fr); }
       .meta dl { grid-template-columns: 1fr; gap: 3px; }
       main, .hero { padding-left: 22px; padding-right: 22px; }
     }
-    @page { size: A4 portrait; margin: 9mm; }
+    @page { size: A4 portrait; margin: 7mm; }
     @media print {
       * {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
       html, body { background: white; }
-      body { font-size: 8.5pt; line-height: 1.32; }
+      body { font-size: 7.8pt; line-height: 1.22; }
       .page { max-width: none; margin: 0; box-shadow: none; }
-      .hero { padding: 7mm 8mm 6mm; }
-      .eyebrow { margin-bottom: 1.5mm; font-size: 7.5pt; }
-      h1 { font-size: 20pt; }
-      .hero-subtitle { margin-top: 1.5mm; font-size: 8.5pt; }
-      main { padding: 5mm 8mm 6mm; }
+      .hero {
+        padding: 2.5mm 5mm 2mm;
+        color: var(--ink);
+        background: white;
+        border-bottom-width: .6mm;
+      }
+      .eyebrow { margin-bottom: .5mm; font-size: 6.5pt; }
+      h1 { font-size: 16pt; }
+      .hero-subtitle { margin-top: .5mm; font-size: 7pt; }
+      main { padding: 2.5mm 5mm 3.5mm; }
       .overview {
-        grid-template-columns: 1fr 1.55fr;
-        gap: 3mm;
-        margin-bottom: 3mm;
+        grid-template-columns: 1.15fr 1.55fr;
+        gap: 2mm;
+        margin-bottom: 2mm;
         break-inside: avoid;
       }
-      .overall, .meta, .legend, .notice { border-radius: 2mm; }
-      .overall, .meta { padding: 3.5mm; }
-      .overall { border-left-width: 1.2mm; }
-      .overall-label { margin-bottom: 1mm; font-size: 7pt; }
-      .overall-value { font-size: 16pt; }
-      .metric-grid { gap: 1.5mm; margin-top: 2.5mm; }
-      .metric { border-radius: 1.5mm; padding: 1.5mm 1mm; }
-      .metric strong { font-size: 11pt; }
-      .metric span { font-size: 6.5pt; }
+      .overall, .meta, .legend, .notice { border-radius: 1mm; background: white; }
+      .overall, .meta { padding: 2mm; }
+      .overall {
+        display: grid;
+        grid-template-columns: 26mm minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-items: center;
+        column-gap: 2mm;
+        border-left-width: 1mm;
+      }
+      .overall-label { margin-bottom: .4mm; font-size: 6.2pt; }
+      .overall-value { font-size: 12.5pt; }
+      .metric-grid {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        gap: 1mm;
+        margin-top: 0;
+      }
+      .metric { border: 1px solid var(--line); border-radius: 1mm; padding: .8mm .5mm; }
+      .metric strong { font-size: 9pt; }
+      .metric span { font-size: 5.8pt; }
       .meta dl {
-        grid-template-columns: 31mm 1fr;
-        gap: 1.2mm 3mm;
+        grid-template-columns: 29mm 1fr;
+        gap: .7mm 2mm;
       }
       .legend {
-        gap: 1.5mm 4mm;
-        margin-bottom: 3mm;
-        padding: 2mm 3mm;
-        font-size: 7.5pt;
-        break-inside: avoid;
-      }
-      .dot { width: 2mm; height: 2mm; }
-      .activities-block {
-        margin-bottom: 4mm;
-        border-radius: 2mm;
-        padding: 3mm 4mm;
-        break-inside: avoid;
-      }
-      .activities-block h2 { margin-bottom: 1.5mm; font-size: 11pt; }
-      .activities-list { padding-left: 5mm; }
-      .activities-list li { margin: .8mm 0; padding-left: .5mm; }
-      .report-section { margin-top: 4mm; break-before: auto; }
-      .report-section > h2 {
+        gap: 1mm 3mm;
         margin-bottom: 2mm;
-        padding-bottom: 1mm;
-        font-size: 13pt;
+        padding: 1.2mm 2mm;
+        font-size: 6.8pt;
+        break-inside: avoid;
+      }
+      .dot { width: 1.6mm; height: 1.6mm; }
+      .activities-block {
+        margin-bottom: 2.5mm;
+        border-radius: 1mm;
+        padding: 1.6mm 2.5mm;
+        background: white;
+        break-inside: avoid;
+      }
+      .activities-block h2 { margin-bottom: .8mm; font-size: 9pt; }
+      .activities-list { padding-left: 4mm; columns: 2; column-gap: 6mm; }
+      .activities-list li { margin: .4mm 0; padding-left: .3mm; break-inside: avoid; }
+      .report-section { margin-top: 2.2mm; break-before: auto; }
+      .report-section > h2 {
+        margin-bottom: 1mm;
+        padding-bottom: .5mm;
+        font-size: 10.5pt;
         break-after: avoid;
       }
       .check-card {
-        margin-bottom: 2.5mm;
-        border-left-width: 1.2mm;
-        border-radius: 1.5mm;
-        padding: 2.5mm 3mm;
+        margin-bottom: 1.4mm;
+        border-left-width: .9mm;
+        border-radius: 1mm;
+        padding: 1.5mm 2mm;
         break-inside: auto;
       }
       .check-card:not(:has(.table-wrap)) { break-inside: avoid; }
-      .check-heading { gap: 3mm; break-after: avoid; }
-      h3 { font-size: 10pt; }
+      .check-card:has(table.key-value) { break-inside: avoid; }
+      .check-heading { gap: 2mm; break-after: avoid; }
+      h3 { font-size: 8.5pt; }
       .status-badge {
-        padding: .8mm 2mm;
-        font-size: 7pt;
+        padding: .5mm 1.5mm;
+        font-size: 6.2pt;
       }
       .summary {
-        margin-top: 1.2mm;
+        margin-top: .5mm;
         break-after: avoid;
       }
       .table-wrap {
         overflow: visible;
-        margin-top: 2mm;
+        margin-top: 1mm;
       }
       table {
-        font-size: 7.3pt;
-        line-height: 1.22;
+        font-size: 7pt;
+        line-height: 1.15;
       }
       thead { display: table-header-group; }
       tr { break-inside: avoid; }
       th, td {
-        padding: 1mm 1.2mm;
+        padding: .65mm .9mm;
         word-break: normal;
         overflow-wrap: anywhere;
       }
@@ -1166,7 +1401,7 @@ $html = @"
       table.wide-table tr {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        margin-bottom: 1.5mm;
+        margin-bottom: .8mm;
         border: 1px solid var(--line);
         border-radius: 1mm;
         overflow: hidden;
@@ -1176,7 +1411,7 @@ $html = @"
       table.wide-table td {
         display: grid;
         grid-template-columns: minmax(25mm, 42%) minmax(0, 1fr);
-        gap: 1.5mm;
+        gap: 1mm;
         border: 0;
         border-bottom: 1px solid var(--line);
         background: white;
@@ -1188,14 +1423,14 @@ $html = @"
         font-weight: 650;
       }
       .notice {
-        margin-top: 4mm;
-        padding: 3mm 4mm;
-        font-size: 7.5pt;
+        margin-top: 2mm;
+        padding: 1.5mm 2mm;
+        font-size: 6.8pt;
         break-inside: avoid;
       }
       footer {
-        padding: 3mm 8mm 2mm;
-        font-size: 7pt;
+        padding: 1.5mm 5mm 1mm;
+        font-size: 6.2pt;
         break-inside: avoid;
       }
     }
