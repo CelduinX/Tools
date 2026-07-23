@@ -246,7 +246,8 @@ function Convert-DetailsToHtml {
     }
 
     $builder = New-Object Text.StringBuilder
-    [void]$builder.Append('<div class="table-wrap"><table><thead><tr>')
+    $tableClass = if ($columns.Count -ge 7) { ' class="wide-table"' } else { '' }
+    [void]$builder.Append(('<div class="table-wrap"><table{0}><thead><tr>' -f $tableClass))
     foreach ($column in $columns) {
         [void]$builder.Append(('<th>{0}</th>' -f (Encode-Html $column)))
     }
@@ -256,7 +257,9 @@ function Convert-DetailsToHtml {
         foreach ($column in $columns) {
             $property = $row.PSObject.Properties[$column]
             $value = if ($null -eq $property) { $null } else { $property.Value }
-            [void]$builder.Append(('<td>{0}</td>' -f (Encode-Html (Convert-DisplayValue $value))))
+            [void]$builder.Append(('<td data-label="{0}">{1}</td>' -f
+                (Encode-Html $column),
+                (Encode-Html (Convert-DisplayValue $value))))
         }
         [void]$builder.Append('</tr>')
     }
@@ -1065,21 +1068,136 @@ $html = @"
       .meta dl { grid-template-columns: 1fr; gap: 3px; }
       main, .hero { padding-left: 22px; padding-right: 22px; }
     }
-    @page { size: A4; margin: 12mm; }
+    @page { size: A4 portrait; margin: 9mm; }
     @media print {
-      body { background: white; font-size: 10pt; }
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      html, body { background: white; }
+      body { font-size: 8.5pt; line-height: 1.32; }
       .page { max-width: none; margin: 0; box-shadow: none; }
-      .hero { padding: 16mm 12mm 10mm; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      main { padding: 8mm 12mm 10mm; }
-      .overview { grid-template-columns: 1.2fr 2fr; gap: 5mm; margin-bottom: 6mm; }
-      .overall, .meta, .legend, .notice { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      .activities-block { break-inside: avoid; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      .report-section { break-before: auto; }
-      .check-card { break-inside: avoid; }
-      .table-wrap { overflow: visible; }
-      table { font-size: 8pt; }
-      th, td { padding: 1.5mm; }
-      footer { padding: 5mm 12mm; }
+      .hero { padding: 7mm 8mm 6mm; }
+      .eyebrow { margin-bottom: 1.5mm; font-size: 7.5pt; }
+      h1 { font-size: 20pt; }
+      .hero-subtitle { margin-top: 1.5mm; font-size: 8.5pt; }
+      main { padding: 5mm 8mm 6mm; }
+      .overview {
+        grid-template-columns: 1fr 1.55fr;
+        gap: 3mm;
+        margin-bottom: 3mm;
+        break-inside: avoid;
+      }
+      .overall, .meta, .legend, .notice { border-radius: 2mm; }
+      .overall, .meta { padding: 3.5mm; }
+      .overall { border-left-width: 1.2mm; }
+      .overall-label { margin-bottom: 1mm; font-size: 7pt; }
+      .overall-value { font-size: 16pt; }
+      .metric-grid { gap: 1.5mm; margin-top: 2.5mm; }
+      .metric { border-radius: 1.5mm; padding: 1.5mm 1mm; }
+      .metric strong { font-size: 11pt; }
+      .metric span { font-size: 6.5pt; }
+      .meta dl {
+        grid-template-columns: 31mm 1fr;
+        gap: 1.2mm 3mm;
+      }
+      .legend {
+        gap: 1.5mm 4mm;
+        margin-bottom: 3mm;
+        padding: 2mm 3mm;
+        font-size: 7.5pt;
+        break-inside: avoid;
+      }
+      .dot { width: 2mm; height: 2mm; }
+      .activities-block {
+        margin-bottom: 4mm;
+        border-radius: 2mm;
+        padding: 3mm 4mm;
+        break-inside: avoid;
+      }
+      .activities-block h2 { margin-bottom: 1.5mm; font-size: 11pt; }
+      .activities-list { padding-left: 5mm; }
+      .activities-list li { margin: .8mm 0; padding-left: .5mm; }
+      .report-section { margin-top: 4mm; break-before: auto; }
+      .report-section > h2 {
+        margin-bottom: 2mm;
+        padding-bottom: 1mm;
+        font-size: 13pt;
+        break-after: avoid;
+      }
+      .check-card {
+        margin-bottom: 2.5mm;
+        border-left-width: 1.2mm;
+        border-radius: 1.5mm;
+        padding: 2.5mm 3mm;
+        break-inside: auto;
+      }
+      .check-card:not(:has(.table-wrap)) { break-inside: avoid; }
+      .check-heading { gap: 3mm; break-after: avoid; }
+      h3 { font-size: 10pt; }
+      .status-badge {
+        padding: .8mm 2mm;
+        font-size: 7pt;
+      }
+      .summary {
+        margin-top: 1.2mm;
+        break-after: avoid;
+      }
+      .table-wrap {
+        overflow: visible;
+        margin-top: 2mm;
+      }
+      table {
+        font-size: 7.3pt;
+        line-height: 1.22;
+      }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; }
+      th, td {
+        padding: 1mm 1.2mm;
+        word-break: normal;
+        overflow-wrap: anywhere;
+      }
+      table.wide-table,
+      table.wide-table tbody {
+        display: block;
+      }
+      table.wide-table thead { display: none; }
+      table.wide-table tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-bottom: 1.5mm;
+        border: 1px solid var(--line);
+        border-radius: 1mm;
+        overflow: hidden;
+        break-inside: avoid;
+      }
+      table.wide-table tr:last-child { margin-bottom: 0; }
+      table.wide-table td {
+        display: grid;
+        grid-template-columns: minmax(25mm, 42%) minmax(0, 1fr);
+        gap: 1.5mm;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: white;
+      }
+      table.wide-table td:nth-child(odd) { border-right: 1px solid var(--line); }
+      table.wide-table td::before {
+        content: attr(data-label);
+        color: #334155;
+        font-weight: 650;
+      }
+      .notice {
+        margin-top: 4mm;
+        padding: 3mm 4mm;
+        font-size: 7.5pt;
+        break-inside: avoid;
+      }
+      footer {
+        padding: 3mm 8mm 2mm;
+        font-size: 7pt;
+        break-inside: avoid;
+      }
     }
   </style>
 </head>

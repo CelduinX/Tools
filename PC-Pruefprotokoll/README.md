@@ -43,6 +43,7 @@ PC-Pruefprotokoll_<Computername>_<Datum_Uhrzeit>\
 - Für die Verbindungstests werden `cloudflare.com` und der öffentliche Cloudflare-DNS-Server `1.1.1.1` verwendet.
 - Der Bericht enthält Geräte-, Serien-, MAC- und IP-Daten, jedoch keine Produktschlüssel, Kennwörter oder WLAN-Schlüssel.
 - Die eingegebenen Tätigkeiten erscheinen als Stichpunktliste im HTML-Bericht und werden zusätzlich in den JSON-Rohdaten gespeichert.
+- Die Druckansicht ist für A4 im Hochformat optimiert; breite Datenträger- und Netzwerktabellen werden dabei automatisch in gut lesbare Detailblöcke umgewandelt.
 - Nicht unterstützte oder nicht zuverlässig auslesbare Werte werden als „Nicht verfügbar“ dokumentiert.
 - Der Bericht ist eine technische Momentaufnahme und keine Garantie für zukünftige Fehlerfreiheit.
 
