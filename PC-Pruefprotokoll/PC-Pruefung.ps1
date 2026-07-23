@@ -865,9 +865,9 @@ catch {
     Add-Check 'Netzwerk' 'HTTPS-Internetverbindung' 'Fehler' 'Das Microsoft-Konnektivitätsziel konnte per HTTPS nicht erreicht werden.'
 }
 
-# 10. Stabilität
+# 10. Systemlaufzeit
 $step++
-Write-Step $step $totalSteps 'Systemstabilität und Ereignisse prüfen'
+Write-Step $step $totalSteps 'Systemlaufzeit ermitteln'
 try {
     $osForBoot = Get-CimInstance -ClassName Win32_OperatingSystem
     $bootTime = Convert-WmiDate $osForBoot.LastBootUpTime
@@ -880,46 +880,6 @@ try {
 catch {
     Add-CollectionError 'Systemlaufzeit' $_
     Add-Check 'Stabilität' 'Systemlaufzeit' 'Nicht verfügbar' 'Der letzte Systemstart konnte nicht ermittelt werden.'
-}
-
-try {
-    $startTime = (Get-Date).AddDays(-7)
-    $relevantIds = @(7, 41, 51, 55, 129, 153, 6008)
-    $events = @(Get-WinEvent -FilterHashtable @{
-        LogName = 'System'
-        StartTime = $startTime
-        Id = $relevantIds
-        Level = @(1, 2, 3)
-    } -ErrorAction SilentlyContinue | Select-Object -First 30)
-
-    if ($events.Count -eq 0) {
-        Add-Check 'Stabilität' 'Relevante Systemereignisse' 'Bestanden' 'In den letzten sieben Tagen wurden keine ausgewählten kritischen Stabilitäts- oder Datenträgerereignisse gefunden.'
-    }
-    else {
-        $eventDetails = @($events | ForEach-Object {
-            [pscustomobject]@{
-                Zeitpunkt = $_.TimeCreated
-                Ereignis_ID = $_.Id
-                Quelle = $_.ProviderName
-                Ebene = $_.LevelDisplayName
-                Meldung = ([string]$_.Message -replace '\s+', ' ').Trim()
-            }
-        })
-        $diskCritical = @($events | Where-Object {
-            ($_.Id -eq 7 -and $_.ProviderName -match '^(disk|Microsoft-Windows-Disk)') -or
-            ($_.Id -eq 55 -and $_.ProviderName -match '^(Ntfs|Microsoft-Windows-Ntfs)')
-        })
-        if ($diskCritical.Count -gt 0) {
-            Add-Check 'Stabilität' 'Relevante Systemereignisse' 'Fehler' 'In den letzten sieben Tagen wurden kritische Datenträger- oder Dateisystemereignisse protokolliert.' $eventDetails
-        }
-        else {
-            Add-Check 'Stabilität' 'Relevante Systemereignisse' 'Warnung' ('In den letzten sieben Tagen wurden {0} relevante Systemereignis(se) gefunden.' -f $events.Count) $eventDetails
-        }
-    }
-}
-catch {
-    Add-CollectionError 'Systemereignisse' $_
-    Add-Check 'Stabilität' 'Relevante Systemereignisse' 'Nicht verfügbar' 'Die relevanten Windows-Systemereignisse konnten nicht gelesen werden.'
 }
 
 Write-Progress -Activity 'PC-Prüfung' -Completed
