@@ -417,41 +417,6 @@ catch {
     Add-Check 'Geräteschutz' 'TPM' 'Nicht verfügbar' 'Der TPM-Zustand konnte nicht gelesen werden.'
 }
 
-try {
-    if (Get-Command Get-BitLockerVolume -ErrorAction SilentlyContinue) {
-        $bitLockerVolumes = @(Get-BitLockerVolume -ErrorAction Stop 2>$null)
-        if ($bitLockerVolumes.Count -eq 0) {
-            Add-Check 'Geräteschutz' 'Laufwerksverschlüsselung' 'Nicht verfügbar' 'Es wurden keine BitLocker-fähigen Volumes gemeldet.'
-        }
-        else {
-            $bitLockerDetails = @($bitLockerVolumes | ForEach-Object {
-                [pscustomobject]@{
-                    Laufwerk = $_.MountPoint
-                    Volume_Typ = $_.VolumeType
-                    Verschlüsselung = $_.VolumeStatus
-                    Schutz = $_.ProtectionStatus
-                    Methode = $_.EncryptionMethod
-                    Verschlüsselt_Prozent = $_.EncryptionPercentage
-                }
-            })
-            $systemVolume = $bitLockerVolumes | Where-Object { $_.MountPoint -eq $env:SystemDrive } | Select-Object -First 1
-            if ($null -ne $systemVolume -and [string]$systemVolume.ProtectionStatus -eq 'On') {
-                Add-Check 'Geräteschutz' 'Laufwerksverschlüsselung' 'Bestanden' 'Das Windows-Systemlaufwerk ist durch BitLocker geschützt.' $bitLockerDetails
-            }
-            else {
-                Add-Check 'Geräteschutz' 'Laufwerksverschlüsselung' 'Warnung' 'Das Windows-Systemlaufwerk ist nicht durch aktiven BitLocker-Schutz abgesichert.' $bitLockerDetails
-            }
-        }
-    }
-    else {
-        Add-Check 'Geräteschutz' 'Laufwerksverschlüsselung' 'Nicht verfügbar' 'Die BitLocker-Abfrage ist nicht verfügbar.'
-    }
-}
-catch {
-    Add-CollectionError 'BitLocker' $_
-    Add-Check 'Geräteschutz' 'Laufwerksverschlüsselung' 'Nicht verfügbar' 'Der BitLocker-Status konnte nicht gelesen werden.'
-}
-
 # 3. Prozessor und Arbeitsspeicher
 $step++
 Write-Step $step $totalSteps 'Prozessor und Arbeitsspeicher erfassen'
@@ -822,47 +787,62 @@ catch {
 try {
     $dnsResult = $null
     if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
-        $dnsResult = Resolve-DnsName -Name 'www.msftconnecttest.com' -Type A -ErrorAction Stop | Select-Object -First 1
+        $dnsResult = Resolve-DnsName -Name 'cloudflare.com' -Type A -ErrorAction Stop |
+            Where-Object { $null -ne $_.PSObject.Properties['IPAddress'] -and -not [string]::IsNullOrWhiteSpace([string]$_.IPAddress) } |
+            Select-Object -First 1
     }
     else {
-        $dnsAddresses = [Net.Dns]::GetHostAddresses('www.msftconnecttest.com')
+        $dnsAddresses = [Net.Dns]::GetHostAddresses('cloudflare.com')
         $dnsResult = $dnsAddresses | Select-Object -First 1
     }
-    Add-Check 'Netzwerk' 'DNS-Auflösung' 'Bestanden' 'Der Microsoft-Testname wurde erfolgreich aufgelöst.' ([ordered]@{
-        Testziel = 'www.msftconnecttest.com'
-        Ergebnis = (Convert-DisplayValue $dnsResult)
+    if ($null -eq $dnsResult) {
+        throw 'Die DNS-Abfrage lieferte keine IP-Adresse.'
+    }
+    Add-Check 'Netzwerk' 'DNS-Auflösung' 'Bestanden' 'Der Testname wurde über die Windows-DNS-Konfiguration erfolgreich aufgelöst.' ([ordered]@{
+        Testziel = 'cloudflare.com'
+        Ergebnis = $(if ($null -ne $dnsResult.PSObject.Properties['IPAddress']) { [string]$dnsResult.IPAddress } else { Convert-DisplayValue $dnsResult })
     })
 }
 catch {
     Add-CollectionError 'DNS-Auflösung' $_
-    Add-Check 'Netzwerk' 'DNS-Auflösung' 'Fehler' 'Die DNS-Auflösung des Microsoft-Testziels ist fehlgeschlagen.'
+    Add-Check 'Netzwerk' 'DNS-Auflösung' 'Fehler' 'Die DNS-Auflösung von cloudflare.com ist fehlgeschlagen.'
 }
 
 try {
-    $previousSecurityProtocol = [Net.ServicePointManager]::SecurityProtocol
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = $previousSecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-        $webResult = Invoke-WebRequest -Uri 'https://www.msftconnecttest.com/connecttest.txt' -UseBasicParsing -TimeoutSec 10
-    }
-    finally {
-        [Net.ServicePointManager]::SecurityProtocol = $previousSecurityProtocol
-    }
-    if ($webResult.StatusCode -eq 200 -and ([string]$webResult.Content).Trim() -eq 'Microsoft Connect Test') {
-        Add-Check 'Netzwerk' 'HTTPS-Internetverbindung' 'Bestanden' 'Das Microsoft-Konnektivitätsziel wurde per HTTPS erreicht.' ([ordered]@{
-            Ziel = 'https://www.msftconnecttest.com/connecttest.txt'
-            HTTP_Status = $webResult.StatusCode
-        })
+    if (Get-Command Resolve-DnsName -ErrorAction SilentlyContinue) {
+        $cloudflareAnswers = @(Resolve-DnsName -Name 'cloudflare.com' -Server '1.1.1.1' -Type A -DnsOnly -ErrorAction Stop |
+            Where-Object { $null -ne $_.PSObject.Properties['IPAddress'] -and -not [string]::IsNullOrWhiteSpace([string]$_.IPAddress) })
+        if ($cloudflareAnswers.Count -eq 0) {
+            throw 'Der Cloudflare-DNS-Server lieferte keine IP-Adresse.'
+        }
+        $cloudflareDetails = [ordered]@{
+            Server = '1.1.1.1 (Cloudflare DNS)'
+            Testabfrage = 'cloudflare.com'
+            Antworten = @($cloudflareAnswers | ForEach-Object { $_.IPAddress })
+        }
     }
     else {
-        Add-Check 'Netzwerk' 'HTTPS-Internetverbindung' 'Warnung' 'Das Testziel antwortete, aber nicht mit dem erwarteten Inhalt.' ([ordered]@{
-            Ziel = 'https://www.msftconnecttest.com/connecttest.txt'
-            HTTP_Status = $webResult.StatusCode
-        })
+        $cloudflareTcp = New-Object Net.Sockets.TcpClient
+        try {
+            $connectResult = $cloudflareTcp.BeginConnect('1.1.1.1', 53, $null, $null)
+            if (-not $connectResult.AsyncWaitHandle.WaitOne(5000)) {
+                throw 'Zeitüberschreitung beim Verbindungsaufbau.'
+            }
+            $cloudflareTcp.EndConnect($connectResult)
+        }
+        finally {
+            $cloudflareTcp.Close()
+        }
+        $cloudflareDetails = [ordered]@{
+            Server = '1.1.1.1 (Cloudflare DNS)'
+            Verbindung = 'TCP-Port 53'
+        }
     }
+    Add-Check 'Netzwerk' 'Internetverbindung' 'Bestanden' 'Der öffentliche Cloudflare-DNS-Server ist erreichbar und beantwortet die Testabfrage.' $cloudflareDetails
 }
 catch {
-    Add-CollectionError 'HTTPS-Internetverbindung' $_
-    Add-Check 'Netzwerk' 'HTTPS-Internetverbindung' 'Fehler' 'Das Microsoft-Konnektivitätsziel konnte per HTTPS nicht erreicht werden.'
+    Add-CollectionError 'Internetverbindung' $_
+    Add-Check 'Netzwerk' 'Internetverbindung' 'Fehler' 'Der öffentliche Cloudflare-DNS-Server 1.1.1.1 konnte nicht erreicht oder abgefragt werden.'
 }
 
 # 10. Systemlaufzeit

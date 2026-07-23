@@ -40,7 +40,7 @@ PC-Pruefprotokoll_<Computername>_<Datum_Uhrzeit>\
 ## Hinweise
 
 - Der übliche Prüflauf dauert je nach Windows-Update-Suche und Internetverbindung etwa 3–8 Minuten.
-- Für den Verbindungstest wird ausschließlich `https://www.msftconnecttest.com/connecttest.txt` aufgerufen.
+- Für die Verbindungstests werden `cloudflare.com` und der öffentliche Cloudflare-DNS-Server `1.1.1.1` verwendet.
 - Der Bericht enthält Geräte-, Serien-, MAC- und IP-Daten, jedoch keine Produktschlüssel, Kennwörter oder WLAN-Schlüssel.
 - Die eingegebenen Tätigkeiten erscheinen als Stichpunktliste im HTML-Bericht und werden zusätzlich in den JSON-Rohdaten gespeichert.
 - Nicht unterstützte oder nicht zuverlässig auslesbare Werte werden als „Nicht verfügbar“ dokumentiert.
