@@ -4,7 +4,17 @@ Dieses portable Werkzeug prüft einen Windows-10- oder Windows-11-PC und erzeugt
 
 Die Dateien dieses Ordners müssen für die Verwendung gemeinsam heruntergeladen und unverändert im selben Verzeichnis abgelegt werden.
 
-## Download
+## Direktstart über PowerShell
+
+PowerShell öffnen und folgenden Befehl ausführen:
+
+```powershell
+irm https://raw.githubusercontent.com/CelduinX/Tools/main/PC-Pruefprotokoll/install.ps1|iex
+```
+
+Der Bootstrap lädt das aktuelle Prüfskript temporär von GitHub, startet es und entfernt die temporäre Kopie nach dem Lauf wieder.
+
+## Manueller Download
 
 1. Laden Sie das Repository über **Code → Download ZIP** herunter.
 2. Entpacken Sie das ZIP-Archiv.
