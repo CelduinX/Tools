@@ -75,13 +75,25 @@ require_root() {
   [[ "${EUID}" -eq 0 ]] || die "Please run this script as root."
 }
 
-require_ubuntu() {
+require_ubuntu_or_debian() {
   [[ -r "$OS_RELEASE_FILE" ]] || die "$OS_RELEASE_FILE not found."
+
   # shellcheck disable=SC1091
   . "$OS_RELEASE_FILE"
-  [[ "${ID:-}" == "ubuntu" ]] || die "This script is intended for Ubuntu Server. Detected ID=${ID:-unknown}."
-  [[ -n "${VERSION_CODENAME:-}" ]] || die "Ubuntu VERSION_CODENAME not found in /etc/os-release."
-  UBUNTU_CODENAME="$VERSION_CODENAME"
+
+  case "${ID:-}" in
+    ubuntu|debian)
+      ;;
+    *)
+      die "This script supports Ubuntu Server and Debian. Detected ID=${ID:-unknown}."
+      ;;
+  esac
+
+  [[ -n "${VERSION_CODENAME:-}" ]] || \
+    die "VERSION_CODENAME not found in /etc/os-release."
+
+  DISTRO_ID="$ID"
+  DISTRO_CODENAME="$VERSION_CODENAME"
 }
 
 choose_base_dir() {
