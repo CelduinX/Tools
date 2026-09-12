@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#8a4f2d" />
+  <title>Catan Würfeltracker</title>
+  <style>
+    :root{
+      --bg:#efe2bd;
+      --paper:#f7edcf;
+      --paper-2:#ead7a5;
+      --wood:#7a4327;
+      --wood-dark:#4d2a1b;
+      --wood-light:#aa6c3f;
+      --ink:#38251a;
+      --muted:#7c6752;
+      --red:#b53a2d;
+      --red-dark:#7c231d;
+      --gold:#d6a83c;
+      --green:#55784a;
+      --sea:#3e7e91;
+      --shadow:0 12px 30px rgba(55,32,17,.18);
+      --radius:20px;
+    }
+
+    *{box-sizing:border-box}
+    html{-webkit-tap-highlight-color:transparent}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(255,255,255,.5), transparent 28%),
+        linear-gradient(180deg,#d9c08a 0%,#efe2bd 42%,#e8d29a 100%);
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      opacity:.18;
+      background-image:
+        repeating-linear-gradient(25deg,rgba(95,58,31,.08) 0 1px,transparent 1px 9px),
+        repeating-linear-gradient(-30deg,rgba(255,255,255,.08) 0 1px,transparent 1px 13px);
+      mix-blend-mode:multiply;
+    }
+
+    .app{
+      position:relative;
+      width:min(100%,760px);
+      margin:0 auto;
+      padding:8px 8px max(10px,env(safe-area-inset-bottom));
+    }
+
+    .hero{
+      position:relative;
+      overflow:hidden;
+      padding:11px 12px 10px;
+      border-radius:18px;
+      color:#fff7e8;
+      background:
+        linear-gradient(145deg,rgba(255,255,255,.08),transparent 35%),
+        linear-gradient(135deg,var(--wood-dark),var(--wood) 55%,var(--wood-light));
+      box-shadow:var(--shadow), inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+
+    .hero::after{
+      content:"";
+      position:absolute;
+      width:160px;height:160px;
+      right:-54px;top:-52px;
+      border:18px solid rgba(214,168,60,.18);
+      transform:rotate(30deg);
+      clip-path:polygon(25% 6.7%,75% 6.7%,100% 50%,75% 93.3%,25% 93.3%,0 50%);
+    }
+
+    .eyebrow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.15em;
+      opacity:.8;
+      font-weight:800;
+    }
+
+    h1{
+      margin:3px 0 2px;
+      font-size:clamp(22px,6vw,30px);
+      line-height:1;
+      letter-spacing:-.04em;
+    }
+
+    .subtitle{
+      margin:0;
+      font-size:9px;
+      line-height:1.25;
+      opacity:.84;
+      max-width:520px;
+    }
+
+    .topstats{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:6px;
+      margin-top:8px;
+    }
+
+    .topstat{
+      padding:6px 5px;
+      border-radius:11px;
+      background:rgba(255,248,225,.11);
+      border:1px solid rgba(255,255,255,.12);
+      text-align:center;
+      backdrop-filter:blur(4px);
+    }
+
+    .topstat strong{
+      display:block;
+      font-size:17px;
+      line-height:1.05;
+      color:#ffe5a0;
+    }
+
+    .topstat span{
+      display:block;
+      font-size:9px;
+      margin-top:4px;
+      opacity:.75;
+    }
+
+    .section-title{
+      display:flex;
+      align-items:end;
+      justify-content:space-between;
+      gap:12px;
+      margin:10px 3px 6px;
+    }
+
+    .section-title h2{
+      margin:0;
+      font-size:15px;
+      letter-spacing:-.02em;
+    }
+
+    .section-title small{
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    .numbers{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:6px;
+    }
+
+    .input-screen{
+      min-height:100svh;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      padding:8px 0 max(8px,env(safe-area-inset-bottom));
+      scroll-margin-top:4px;
+    }
+
+    .input-screen .section-title{
+      flex:0 0 auto;
+      margin:0 3px 7px;
+    }
+
+    .input-screen .numbers{
+      flex:0 0 auto;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      grid-template-rows:repeat(4,auto);
+    }
+
+    .roll-card{
+      display:flex;
+      flex-direction:column;
+      min-height:88px;
+      border-radius:14px;
+      overflow:hidden;
+      background:rgba(255,249,229,.88);
+      border:1px solid rgba(86,52,26,.16);
+      box-shadow:0 4px 10px rgba(77,42,27,.08);
+    }
+
+    .roll-card.seven{
+      background:linear-gradient(145deg,#f7e3d8,#f2c7b8);
+      border-color:rgba(181,58,45,.35);
+    }
+
+    .num-badge{
+      display:grid;
+      place-items:center;
+      width:100%;
+      min-height:46px;
+      padding:4px;
+      color:#fff8e9;
+      background:linear-gradient(180deg,var(--wood-light),var(--wood));
+      font-size:30px;
+      line-height:1;
+      font-weight:1000;
+      letter-spacing:-.04em;
+      text-shadow:0 2px 0 rgba(0,0,0,.18);
+      box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);
+      transition:transform .08s ease, filter .08s ease;
+    }
+
+    .num-badge:active{
+      transform:scale(.97);
+      filter:brightness(1.08);
+    }
+
+    .seven .num-badge{
+      background:linear-gradient(180deg,#d75a48,var(--red-dark));
+    }
+
+    .roll-main{
+      padding:5px;
+      display:grid;
+      grid-template-rows:auto auto;
+      gap:4px;
+    }
+
+    .countline{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    .count{
+      font-size:18px;
+      font-weight:900;
+      line-height:1;
+    }
+
+    .pct{
+      font-size:9px;
+      color:var(--muted);
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:4px;
+    }
+
+    button{
+      appearance:none;
+      border:0;
+      font:inherit;
+      cursor:pointer;
+      touch-action:manipulation;
+      user-select:none;
+    }
+
+    .step{
+      height:28px;
+      border-radius:8px;
+      font-size:17px;
+      font-weight:900;
+      color:var(--ink);
+      background:#e4d2a5;
+      box-shadow:inset 0 -2px 0 rgba(89,56,31,.13);
+    }
+
+    .step.plus{
+      color:#fff;
+      background:linear-gradient(180deg,#6e925f,var(--green));
+    }
+
+    .step:active{transform:translateY(1px);filter:brightness(.96)}
+
+    .panel{
+      margin-top:8px;
+      padding:15px;
+      border-radius:20px;
+      background:rgba(255,249,229,.78);
+      border:1px solid rgba(86,52,26,.14);
+      box-shadow:0 8px 24px rgba(77,42,27,.08);
+    }
+
+    .chart{
+      display:flex;
+      align-items:end;
+      gap:6px;
+      height:190px;
+      padding:8px 2px 28px;
+      position:relative;
+      border-bottom:1px solid rgba(76,48,29,.18);
+    }
+
+    .bar-wrap{
+      flex:1;
+      min-width:0;
+      height:100%;
+      display:flex;
+      align-items:end;
+      justify-content:center;
+      position:relative;
+    }
+
+    .bar{
+      width:min(28px,82%);
+      min-height:2px;
+      border-radius:8px 8px 3px 3px;
+      background:linear-gradient(180deg,var(--gold),#b47a23);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+      transition:height .24s ease;
+      position:relative;
+    }
+
+    .bar.seven{
+      background:linear-gradient(180deg,#d85a49,var(--red));
+    }
+
+    .bar-label{
+      position:absolute;
+      bottom:-23px;
+      left:50%;
+      transform:translateX(-50%);
+      font-size:11px;
+      font-weight:900;
+      color:var(--muted);
+    }
+
+    .bar-value{
+      position:absolute;
+      top:-19px;
+      left:50%;
+      transform:translateX(-50%);
+      font-size:10px;
+      font-weight:900;
+      color:var(--ink);
+    }
+
+    .details{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .detail{
+      padding:12px;
+      border-radius:14px;
+      background:rgba(226,207,158,.45);
+    }
+
+    .detail span{
+      display:block;
+      font-size:11px;
+      color:var(--muted);
+      font-weight:800;
+      margin-bottom:3px;
+    }
+
+    .detail strong{
+      display:block;
+      font-size:17px;
+    }
+
+    .footer-actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .secondary{
+      min-height:46px;
+      border-radius:14px;
+      background:#d7c08c;
+      color:var(--ink);
+      font-weight:900;
+      border:1px solid rgba(74,45,26,.12);
+    }
+
+    .danger{
+      color:#fff8eb;
+      background:linear-gradient(180deg,#b95445,#8d3027);
+    }
+
+    .hint{
+      text-align:center;
+      margin:6px 5px 0;
+      color:var(--muted);
+      font-size:9px;
+      line-height:1.4;
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:max(18px,env(safe-area-inset-bottom));
+      transform:translate(-50%,18px);
+      background:#3f2a1d;
+      color:#fff7e8;
+      padding:10px 15px;
+      border-radius:999px;
+      font-size:17px;
+      font-weight:800;
+      opacity:0;
+      pointer-events:none;
+      transition:.22s ease;
+      box-shadow:0 10px 30px rgba(0,0,0,.2);
+      z-index:10;
+    }
+
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+
+    @media (min-width:560px){
+      .input-screen .numbers{grid-template-columns:repeat(4,minmax(0,1fr))}
+    }
+
+    @media (max-height:720px){
+      .input-screen{min-height:100svh;padding-top:5px;padding-bottom:5px}
+      .input-screen .section-title{margin-bottom:5px}
+      .input-screen .numbers{gap:5px}
+      .input-screen .roll-card{min-height:82px}
+      .input-screen .num-badge{min-height:42px;font-size:28px}
+      .input-screen .step{height:26px}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <div class="eyebrow">🎲 Würfelstatistik</div>
+      <h1>Catan Würfeltracker</h1>
+      <p class="subtitle">Zähle jeden Wurf direkt am Tisch. Deine Statistik bleibt automatisch auf diesem Gerät gespeichert.</p>
+
+      <div class="topstats">
+        <div class="topstat"><strong id="totalRolls">0</strong><span>Würfe</span></div>
+        <div class="topstat"><strong id="topNumber">–</strong><span>Häufigste Zahl</span></div>
+        <div class="topstat"><strong id="avgRoll">–</strong><span>Ø Wurf</span></div>
+      </div>
+    </section>
+
+    <div class="section-title">
+      <h2>Statistik</h2>
+      <small>Verteilung</small>
+    </div>
+
+    <section class="panel">
+      <div class="chart" id="chart"></div>
+
+      <div class="details">
+        <div class="detail">
+          <span>7er-Anteil</span>
+          <strong id="sevenShare">0 %</strong>
+        </div>
+        <div class="detail">
+          <span>Seltenste Zahl</span>
+          <strong id="rareNumber">–</strong>
+        </div>
+        <div class="detail">
+          <span>Theorie: 7</span>
+          <strong id="expected7">16,7 %</strong>
+        </div>
+        <div class="detail">
+          <span>Letzte Änderung</span>
+          <strong id="lastChange">–</strong>
+        </div>
+      </div>
+
+      <div class="footer-actions">
+        <button class="secondary" id="undoBtn">↶ Rückgängig</button>
+        <button class="secondary danger" id="resetBtn">Alles löschen</button>
+      </div>
+    </section>
+
+    <p class="hint">Bei zwei normalen sechsseitigen Würfeln fällt die 7 theoretisch am häufigsten. Die Daten werden nur lokal im Browser gespeichert.</p>
+
+    <section class="input-screen" id="eingabe">
+      <div class="section-title">
+        <h2>Zahlen antippen</h2>
+        <small>2 bis 12 · Tipp = +1</small>
+      </div>
+      <section class="numbers" id="numberGrid"></section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "catan-dice-tracker-v1";
+    const numbers = Array.from({length: 11}, (_, i) => i + 2);
+    const state = loadState();
+    let history = [];
+
+    function freshCounts(){
+      return Object.fromEntries(numbers.map(n => [n, 0]));
+    }
+
+    function loadState(){
+      try{
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if(saved && saved.counts){
+          const clean = freshCounts();
+          numbers.forEach(n => clean[n] = Math.max(0, Number(saved.counts[n]) || 0));
+          return { counts: clean, lastChange: saved.lastChange || null };
+        }
+      }catch(e){}
+      return { counts: freshCounts(), lastChange: null };
+    }
+
+    function saveState(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function total(){
+      return numbers.reduce((sum, n) => sum + state.counts[n], 0);
+    }
+
+    function pushHistory(){
+      history.push(JSON.stringify(state));
+      if(history.length > 30) history.shift();
+    }
+
+    function change(n, delta){
+      if(delta < 0 && state.counts[n] <= 0) return;
+      pushHistory();
+      state.counts[n] = Math.max(0, state.counts[n] + delta);
+      state.lastChange = `${delta > 0 ? "+" : "−"}1 bei ${n}`;
+      saveState();
+      render();
+      if(navigator.vibrate) navigator.vibrate(18);
+    }
+
+    function undo(){
+      if(!history.length){
+        showToast("Nichts zum Rückgängigmachen");
+        return;
+      }
+      const prev = JSON.parse(history.pop());
+      state.counts = prev.counts;
+      state.lastChange = prev.lastChange;
+      saveState();
+      render();
+      showToast("Letzte Änderung rückgängig");
+    }
+
+    function resetAll(){
+      if(total() === 0) return showToast("Noch keine Würfe vorhanden");
+      if(!confirm("Wirklich alle gezählten Würfe löschen?")) return;
+      pushHistory();
+      state.counts = freshCounts();
+      state.lastChange = "Zurückgesetzt";
+      saveState();
+      render();
+      showToast("Statistik gelöscht");
+    }
+
+    function renderGrid(){
+      const grid = document.getElementById("numberGrid");
+      const t = total();
+
+      grid.innerHTML = numbers.map(n => {
+        const count = state.counts[n];
+        const pct = t ? ((count / t) * 100).toFixed(1).replace(".", ",") : "0,0";
+        return `
+          <article class="roll-card ${n === 7 ? "seven" : ""}">
+            <button class="num-badge" aria-label="${n} gewürfelt, plus eins" onclick="change(${n}, 1)">${n}</button>
+            <div class="roll-main">
+              <div class="countline">
+                <div class="count">${count}</div>
+                <div class="pct">${pct} %</div>
+              </div>
+              <div class="actions">
+                <button class="step" aria-label="${n} minus eins" onclick="change(${n}, -1)">−</button>
+                <button class="step plus" aria-label="${n} plus eins" onclick="change(${n}, 1)">+</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderChart(){
+      const chart = document.getElementById("chart");
+      const max = Math.max(1, ...numbers.map(n => state.counts[n]));
+      chart.innerHTML = numbers.map(n => {
+        const value = state.counts[n];
+        const h = value ? Math.max(8, (value / max) * 100) : 2;
+        return `
+          <div class="bar-wrap" title="${n}: ${value}">
+            <div class="bar ${n === 7 ? "seven" : ""}" style="height:${h}%">
+              ${value ? `<span class="bar-value">${value}</span>` : ""}
+            </div>
+            <span class="bar-label">${n}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderStats(){
+      const t = total();
+      document.getElementById("totalRolls").textContent = t;
+
+      if(t === 0){
+        document.getElementById("topNumber").textContent = "–";
+        document.getElementById("avgRoll").textContent = "–";
+        document.getElementById("sevenShare").textContent = "0 %";
+        document.getElementById("rareNumber").textContent = "–";
+      }else{
+        const maxCount = Math.max(...numbers.map(n => state.counts[n]));
+        const top = numbers.filter(n => state.counts[n] === maxCount);
+        document.getElementById("topNumber").textContent = top.join(" / ");
+
+        const weighted = numbers.reduce((sum, n) => sum + n * state.counts[n], 0);
+        document.getElementById("avgRoll").textContent = (weighted / t).toFixed(2).replace(".", ",");
+
+        document.getElementById("sevenShare").textContent =
+          ((state.counts[7] / t) * 100).toFixed(1).replace(".", ",") + " %";
+
+        const positive = numbers.filter(n => state.counts[n] > 0);
+        const minCount = Math.min(...positive.map(n => state.counts[n]));
+        const rare = positive.filter(n => state.counts[n] === minCount);
+        document.getElementById("rareNumber").textContent = rare.join(" / ");
+      }
+
+      document.getElementById("lastChange").textContent = state.lastChange || "–";
+      document.getElementById("undoBtn").disabled = history.length === 0;
+      document.getElementById("undoBtn").style.opacity = history.length ? "1" : ".55";
+    }
+
+    function render(){
+      renderGrid();
+      renderChart();
+      renderStats();
+    }
+
+    function showToast(text){
+      const el = document.getElementById("toast");
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => el.classList.remove("show"), 1500);
+    }
+
+    document.getElementById("undoBtn").addEventListener("click", undo);
+    document.getElementById("resetBtn").addEventListener("click", resetAll);
+
+    render();
+  </script>
+</body>
+</html>
