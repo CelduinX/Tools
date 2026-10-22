@@ -1,83 +1,92 @@
 # 🩺 Windows-Systemdiagnose
 
-**Automatische Fehleranalyse für Windows 10 und Windows 11** – besonders hilfreich bei **Spiel-Freezes, Sound-Aussetzern, Treiberproblemen und Abstürzen**.
+Ein PowerShell-Skript zur **automatischen Erfassung wichtiger Windows-Diagnosedaten**. Es bündelt Systeminformationen, Treiberübersichten, Ereignisprotokolle und Diagnoseberichte in einer **ZIP-Datei mit Zeitstempel auf dem Desktop**.
 
-Das PowerShell-Skript sammelt wichtige Systeminformationen und Windows-Protokolle und speichert alles als **ZIP-Datei mit Zeitstempel direkt auf deinem Desktop**. Es verändert keine Systemeinstellungen.
+Die Sammlung dient als Grundlage für die allgemeine **Systemanalyse, Dokumentation und Fehlerdiagnose** unter Windows 10 und Windows 11. Das Skript nimmt keine Änderungen an Systemeinstellungen vor und überträgt keine Diagnosedaten an Dritte.
 
-## 🚀 Schnellstart (ein Befehl)
+## 🚀 Schnellstart
 
-1. Öffne **PowerShell** über das Windows-Startmenü.
-2. Kopiere den folgenden Befehl hinein und bestätige mit **Enter**.
-3. Bestätige ggf. die Windows-Abfrage für **Administratorrechte**.
-4. Nach Abschluss findest du die ZIP-Datei auf deinem **Desktop**.
-
-> **Vor der Veröffentlichung anpassen:** `DEIN-GITHUB-NAME` und `DEIN-REPO` durch deinen GitHub-Benutzernamen und Repository-Namen ersetzen. Das Skript muss im **öffentlichen** Repository auf Branch `main` liegen.
+1. **PowerShell** über das Windows-Startmenü öffnen.
+2. Den folgenden Befehl einfügen und mit **Enter** ausführen.
+3. Eine eventuelle Nachfrage nach **Administratorrechten** bestätigen.
+4. Nach Abschluss befindet sich das Diagnosearchiv auf dem **Desktop**.
 
 ```powershell
 irm 'https://raw.githubusercontent.com/DEIN-GITHUB-NAME/DEIN-REPO/main/Systemdiagnose.ps1' -OutFile "$env:TEMP\Systemdiagnose.ps1"; if ($?) { powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Systemdiagnose.ps1" }
 ```
 
-**Was passiert?** `irm` (*Invoke-RestMethod*) lädt die Skriptdatei von GitHub herunter; anschließend wird sie ausgeführt. `itm` ist **kein** entsprechender Standardbefehl von PowerShell.
+> **Für Repository-Betreiber:** Vor der Veröffentlichung `DEIN-GITHUB-NAME` und `DEIN-REPO` ersetzen. Der Link setzt voraus, dass `Systemdiagnose.ps1` im öffentlichen Repository auf dem Branch `main` liegt.
 
-> 🔐 **Sicherheit:** Führe diesen Befehl nur aus, wenn du dem GitHub-Repository vertraust. Prüfe nach Möglichkeit zuerst den Quelltext in [`Systemdiagnose.ps1`](./Systemdiagnose.ps1). Die Option `-ExecutionPolicy Bypass` gilt nur für den gestarteten PowerShell-Prozess und ändert keine dauerhaften Windows-Einstellungen.
+**Was macht der Befehl?** `irm` (`Invoke-RestMethod`) lädt das PowerShell-Skript von GitHub herunter. Anschließend wird die heruntergeladene Datei lokal ausgeführt.
 
-## 📦 Was wird gesammelt?
+> ⚠️ **Sicherheit:** Skripte aus dem Internet nur aus vertrauenswürdigen Quellen ausführen. Den [Quellcode](./Systemdiagnose.ps1) vorab prüfen. `-ExecutionPolicy Bypass` gilt ausschließlich für den gestarteten PowerShell-Prozess.
 
-| Datei / Bereich | Inhalt |
+## 📦 Enthaltene Diagnosedaten
+
+| Bereich | Erfasste Informationen |
 | --- | --- |
-| `Systeminformationen/Hardware_und_Windows.json` | Windows-Version, CPU, RAM, GPU, Audio, Speicherplatz, BIOS |
-| `Systeminformationen/Grafik_Audio_Treiber.csv` | Installierte Grafik- und Audiotreiber inklusive Versionen |
-| `Ereignisprotokolle/*.evtx` | Export der letzten **7 Tage**, etwa System-/Anwendungsfehler und Windows-Warnungen |
-| `Ereignisprotokolle/*_Fehleruebersicht.csv` | Schnell lesbare Fehler- und Warnungsübersicht, maximal 500 Einträge je Protokoll |
-| `Berichte/DxDiag.txt` | DirectX-, Grafik- und Audiobericht |
-| `Berichte/MSInfo32.txt` | Erweiterte Windows-Systeminformationen |
-| `Abstuerze/*.csv` | Zuverlässigkeitsverlauf und Namen von Windows-Fehlerberichten (sofern verfügbar) |
-| `Sammlungsprotokoll.txt` | Übersicht erfolgreicher und fehlgeschlagener Sammelschritte |
+| **Systeminformationen** | Windows-Version, Hardware, CPU, Arbeitsspeicher, Grafikkarte, Audiogeräte, Laufwerke, BIOS |
+| **Treiber** | Installierte Grafik- und Audiotreiber mit Versionsangaben |
+| **Ereignisprotokolle** | Ausgewählte Windows-Protokolle der letzten **7 Tage** als `.evtx` |
+| **Fehlerübersichten** | Fehler und Warnungen aus System- und Anwendungsprotokollen als `.csv` (maximal 500 je Protokoll) |
+| **DxDiag** | DirectX-, Grafik- und Audiobericht als `.txt` |
+| **MSInfo32** | Erweiterte Windows-Systeminformationen als `.txt` |
+| **Zuverlässigkeit und Abstürze** | Zuverlässigkeitsereignisse und Metadaten vorhandener Windows-Fehlerberichte |
+| **Sammlungsprotokoll** | Status und eventuelle Fehler der einzelnen Erfassungsschritte |
 
-Einzelne Berichte können je nach Windows-Konfiguration, Berechtigungen oder verfügbaren Ereignisprotokollen fehlen. **Fehlgeschlagene Schritte werden protokolliert; die übrige Analyse läuft weiter.**
+> **Hinweis:** Nicht alle Informationen sind auf jedem System verfügbar. Nicht erfolgreiche Erfassungsschritte werden protokolliert; die übrige Datensammlung wird fortgesetzt.
 
-## 🗂️ Ergebnis auf dem Desktop
+## 🗂️ Ausgabe
 
-Beispiel für den Dateinamen:
+Die Ergebnisse werden automatisch als ZIP-Archiv auf dem vom System ermittelten Desktop gespeichert.
+
+**Beispiel:**
 
 ```text
 Systemdiagnose_2026-10-22_21-30-00.zip
 ```
 
-Die ZIP kann anschließend an eine **vertrauenswürdige Person für die Fehleranalyse** gesendet werden. Das Skript lädt **keine Diagnosedaten** ins Internet hoch; es lädt lediglich das Skript von GitHub herunter.
-
-## 🎮 Hinweis bei Spiel- und Streaming-Problemen
-
-Um Sound-Aussetzer und Freezes besser einzugrenzen, notiere zusätzlich:
-
-- **Welches Spiel** ist betroffen – eines oder mehrere?
-- Tritt der Fehler **auch ohne OBS / Streaming** auf?
-- **Ungefähre Uhrzeit** eines Aussetzers (wichtig zum Abgleich der Ereignislogs).
-
-Die Diagnose ist eine Momentaufnahme und misst **keine Live-Frametimes oder DPC-Latenzen**.
+Das Archiv enthält thematisch sortierte Unterordner und kann lokal ausgewertet oder bei Bedarf an eine vertrauenswürdige Supportperson weitergegeben werden. Eine **automatische Übertragung der Diagnosedaten findet nicht statt**.
 
 ## 🔒 Datenschutz
 
-⚠️ Die ZIP kann **Benutzernamen, Computernamen, installierte Programme, Dateipfade, Hardwaredetails und Inhalte aus Windows-Ereignisprotokollen** enthalten. **Nicht öffentlich** in GitHub-Issues, Discord-Kanälen oder Cloud-Freigaben posten. Teile sie nur privat mit Personen, denen du vertraust, und prüfe die Daten vorher.
+Die Berichte können unter anderem **Benutzernamen, Computernamen, Softwarelisten, Dateipfade, Geräteinformationen und protokollierte Fehlermeldungen** enthalten.
 
-## 🛠️ Voraussetzungen und Fehlerbehebung
+- Archiv **vor dem Weitergeben prüfen**.
+- Diagnosearchive **nicht öffentlich** in Repositories, Issues oder Foren hochladen.
+- Dateien nur an Personen senden, denen du vertraust.
 
-- **Betriebssystem:** Windows 10 oder 11, PowerShell 5.1 oder neuer.
-- **Internet:** Nur zum Herunterladen des Skripts erforderlich.
-- **Administratorrechte:** Empfohlen; das Skript fordert sie selbst an. Wenn sie abgelehnt werden, läuft die Sammlung eingeschränkt weiter.
-- **Befehl lädt nicht:** Prüfe, ob das Repository öffentlich ist, beide Platzhalter ersetzt sind und die Datei auf `main` liegt. Bei anderem Branchnamen den Link anpassen.
-- **Datei erscheint nicht:** Prüfe die angezeigte Fehlermeldung. Der Desktop kann z. B. über OneDrive umgeleitet sein; das Skript nutzt den von Windows gemeldeten Desktop-Pfad.
+## ⚙️ Voraussetzungen
 
-### Alternativ: Manuell starten
+- **Betriebssystem:** Windows 10 oder Windows 11
+- **PowerShell:** Windows PowerShell 5.1 oder neuer
+- **Internetverbindung:** Für den Download über den Schnellstart erforderlich
+- **Administratorrechte:** Für eine vollständigere Datenerfassung empfohlen; das Skript fordert sie bei Bedarf an
 
-1. Lade [`Systemdiagnose.ps1`](./Systemdiagnose.ps1) herunter.
-2. Öffne im Downloadordner PowerShell.
-3. Starte:
+### Alternative: Manuelle Ausführung
+
+1. [`Systemdiagnose.ps1`](./Systemdiagnose.ps1) herunterladen.
+2. PowerShell im Ordner der Datei öffnen.
+3. Skript starten:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Systemdiagnose.ps1"
 ```
 
+### Häufige Fragen
+
+**Wo finde ich die ZIP-Datei?**  
+Auf dem Desktop des ausführenden Windows-Benutzers. Bei einer Desktop-Umleitung (z. B. OneDrive) verwendet das Skript den von Windows gemeldeten Desktop-Pfad.
+
+**Werden Windows-Einstellungen verändert?**  
+Nein. Das Skript erfasst Informationen und erzeugt ein lokales Diagnosearchiv.
+
+**Was passiert, wenn ein Bericht nicht erstellt werden kann?**  
+Der Fehler wird im Sammlungsprotokoll festgehalten. Andere Erfassungsschritte werden nach Möglichkeit trotzdem abgeschlossen.
+
+**Muss zusätzliche Software installiert werden?**  
+Nein. Das Skript verwendet integrierte Windows- und PowerShell-Werkzeuge.
+
 ---
 
-**Ziel:** Wichtige Windows-Diagnosedaten in einer einzigen, zeitgestempelten ZIP-Datei bündeln – ohne zusätzliche Softwareinstallation.
+**Zweck:** Eine nachvollziehbare, weitgehend automatisierte Windows-Systemdiagnose in einem einzigen Archiv – ohne zusätzliche Installation.
