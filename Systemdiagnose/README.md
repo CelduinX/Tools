@@ -12,7 +12,7 @@ Die Sammlung dient als Grundlage für die allgemeine **Systemanalyse, Dokumentat
 4. Nach Abschluss befindet sich das Diagnosearchiv auf dem **Desktop**.
 
 ```powershell
-irm 'https://raw.githubusercontent.com/DEIN-GITHUB-NAME/DEIN-REPO/main/Systemdiagnose.ps1' -OutFile "$env:TEMP\Systemdiagnose.ps1"; if ($?) { powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Systemdiagnose.ps1" }
+irm 'https://raw.githubusercontent.com/CelduinX/Tools/tree/main/Systemdiagnose/Systemdiagnose.ps1' -OutFile "$env:TEMP\Systemdiagnose.ps1"; if ($?) { powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Systemdiagnose.ps1" }
 ```
 
 > **Für Repository-Betreiber:** Vor der Veröffentlichung `DEIN-GITHUB-NAME` und `DEIN-REPO` ersetzen. Der Link setzt voraus, dass `Systemdiagnose.ps1` im öffentlichen Repository auf dem Branch `main` liegt.
