@@ -30,7 +30,7 @@ Drücke gleichzeitig <kbd>Windows</kbd> + <kbd>R</kbd>.
 Kopiere die **gesamte Zeile** in das Feld „Öffnen“ und drücke <kbd>Enter</kbd>.
 
 ```text
-powershell.exe -NoProfile -Command "try{irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1 -ea Stop|iex}catch{Write-Host $_ -ForegroundColor Red};Read-Host 'Enter zum Schliessen'"
+powershell.exe -NoProfile -Command "try{(irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1 -ea Stop).TrimStart([char]65279)|iex}catch{Write-Host $_ -ForegroundColor Red};Read-Host 'Enter zum Schliessen'"
 ```
 
 **3. Installation abwarten**

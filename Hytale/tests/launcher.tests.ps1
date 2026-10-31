@@ -19,7 +19,9 @@ function Invoke-RestMethod {
     if ($script:failDownload) { throw 'TEST_NETWORK_FAILURE' }
     if ($script:useActualInstaller) {
         # Preserve every downloaded character; ReadAllText would hide a leading BOM.
-        return [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $repoRoot 'Hytale/install.ps1')))
+        $text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $repoRoot 'Hytale/install.ps1')))
+        if ($script:prependBom) { return ([string][char]0xFEFF + $text) }
+        return $text
     }
     return "Write-Host 'TEST_INSTALL_COMPLETED'"
 }
@@ -59,11 +61,16 @@ try {
     $script:confirmations = 0
     $installerBytes = [IO.File]::ReadAllBytes((Join-Path $repoRoot 'Hytale/install.ps1'))
     if ($installerBytes[0] -eq 0xEF -and $installerBytes[1] -eq 0xBB -and $installerBytes[2] -eq 0xBF) { throw 'Downloaded installer must not have a UTF-8 BOM' }
-    & ([scriptblock]::Create($payload))
-    if ($script:messages -notcontains 'Fertig! Dein Sprachpaket ist installiert.') { throw 'Actual downloaded installer did not complete' }
-    if ($script:confirmations -ne 1) { throw 'Actual installer skipped confirmation' }
+    foreach ($bom in @($false, $true)) {
+        $script:prependBom = $bom
+        $script:messages = @()
+        $script:confirmations = 0
+        & ([scriptblock]::Create($payload))
+        if ($script:messages -notcontains 'Fertig! Dein Sprachpaket ist installiert.') { throw "Actual downloaded installer did not complete; BOM=$bom" }
+        if ($script:confirmations -ne 1) { throw 'Actual installer skipped confirmation' }
+    }
     $installedZip = Join-Path $env:APPDATA 'Hytale/UserData/Mods/Deutsches_Sprachpaket.zip'
     if (-not (Test-Path -LiteralPath $installedZip)) { throw 'Actual installer did not install the mod' }
-    Write-Output 'PASS: exact installer bytes through download/IEX, complete installation and final confirmation'
+    Write-Output 'PASS: full download/IEX installation with and without BOM, and final confirmation'
 }
 finally { $env:APPDATA = $originalAppData }
