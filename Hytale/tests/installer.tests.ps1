@@ -2,7 +2,8 @@
 $hytaleRoot = Split-Path $PSScriptRoot -Parent
 $tokens = $null
 $parseErrors = $null
-$ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $hytaleRoot 'install.ps1'), [ref]$tokens, [ref]$parseErrors)
+$installerText = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $hytaleRoot 'install.ps1')))
+$ast = [Management.Automation.Language.Parser]::ParseInput($installerText, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $definitions = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Install-HytaleLanguagePack', 'Get-HytaleFailureMessage') }, $false))
 foreach ($definition in $definitions) { . ([scriptblock]::Create($definition.Extent.Text)) }
