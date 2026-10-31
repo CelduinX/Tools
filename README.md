@@ -10,13 +10,17 @@
 
 ## 🎮 Hytale auf Deutsch
 
-**Windows** · Installiert die deutsche Community-Übersetzung für Hytale.
+**Windows · Hytale 0.7** · Deutsche Menüs und Spieltexte mit automatischer Installation.
 
-```powershell
-irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1|iex
+Hytale schließen, **Windows-Taste + R** drücken, die gesamte Zeile einfügen und mit **Enter** starten:
+
+```text
+powershell.exe -NoProfile -Command "try{irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1 -ea Stop|iex}catch{Write-Host $_ -ForegroundColor Red};Read-Host 'Enter zum Schliessen'"
 ```
 
-📖 [Anleitung](Hytale/README.md)
+PowerShell installiert das Sprachpaket automatisch und bleibt bis zur Bestätigung mit **Enter** geöffnet. Danach in Hytale unter **Settings → Language → Deutsch** die Sprache auswählen und das Sprachpaket für die Spielwelt aktivieren.
+
+📖 [Schritt für Schritt & Hilfe](Hytale/README.md)
 
 ---
 

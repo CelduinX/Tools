@@ -1,45 +1,124 @@
-# Hytale auf Deutsch
+<div align="center">
 
-Der PowerShell-Einzeiler installiert das vollständige **Deutsche Sprachpaket 2.0.1 für Hytale 0.7**: Spieltexte, Avatar-Optionen und Menüsprache.
+# 🎮 Hytale auf Deutsch
 
-Quelle: [Deutsches Sprachpaket von EinfachNurTeo auf CurseForge](https://www.curseforge.com/hytale/translations/deutsches-sprachpaket/files/9261557), veröffentlicht am 19.10.2026. Dies ist die neueste stabile Release-Version; die neuere 2.1.0 ist eine Beta für Hytale 0.8 und wird hier nicht installiert.
+### Dein Abenteuer. Deine Sprache. 🇩🇪
 
-## Installation
+Deutsche Menüs, Gegenstände und Spieltexte — in wenigen Schritten startklar.
 
-1. Hytale vollständig schließen.
-2. PowerShell oder Windows-Terminal mit PowerShell öffnen. Administratorrechte sind nicht erforderlich.
-3. Den folgenden Befehl vollständig kopieren, einfügen und mit `Enter` ausführen:
+**Windows** &nbsp;•&nbsp; **Hytale 0.7** &nbsp;•&nbsp; **Sprachpaket 2.0.1**
 
-```powershell
-irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1|iex
-```
+[🚀 Loslegen](#installation) &nbsp;·&nbsp; [❓ Hilfe](#hilfe) &nbsp;·&nbsp; [💛 Credits](#credits)
 
-Danach Hytale starten und unter **Settings → Language → Deutsch** auswählen. Für die Spieltexte muss die Mod in der jeweiligen Spielwelt aktiviert sein.
+</div>
 
-## Was macht der Befehl?
+---
 
-Das Installationsskript lädt `Deutsches_Sprachpaket-2.0.1-komplett.zip` aus diesem Repository herunter, prüft die SHA-256-Prüfsumme und entpackt das Archiv in einen zufälligen temporären Ordner. Es prüft die benötigten Dateien, bevor es die Installation verändert.
+<a id="installation"></a>
 
-- Die unveränderte Mod-ZIP wird als `%APPDATA%\Hytale\UserData\Mods\Deutsches_Sprachpaket.zip` installiert.
-- Der Inhalt von `Menuesprache\de-DE` wird nach `%APPDATA%\Hytale\install\release\package\game\latest\Client\Data\Shared\Language\de-DE` kopiert.
-- Vorhandene Dateien mit gleichem Namen werden überschrieben. Andere Mods und Dateien werden nicht gelöscht.
-- Temporäre Downloads und entpackte Dateien werden anschließend entfernt, auch bei einem Fehler.
+## 🚀 So geht’s
 
-SHA-256 des Originalarchivs:
+> [!IMPORTANT]
+> Für **Hytale 0.7 unter Windows**. Schließe Hytale, bevor du beginnst.
+
+**1. „Ausführen“ öffnen**
+
+Drücke gleichzeitig <kbd>Windows</kbd> + <kbd>R</kbd>.
+
+**2. Befehl kopieren und starten**
+
+Kopiere die **gesamte Zeile** in das Feld „Öffnen“ und drücke <kbd>Enter</kbd>.
 
 ```text
-95418AD6EDB2B218B2EF6C941DCFAB8C9D2879760A0FE1BA13C3F519032EFBAC
+powershell.exe -NoProfile -Command "try{irm https://raw.githubusercontent.com/CelduinX/Tools/main/Hytale/install.ps1 -ea Stop|iex}catch{Write-Host $_ -ForegroundColor Red};Read-Host 'Enter zum Schliessen'"
 ```
 
-## Aktualisieren oder erneut installieren
+**3. Installation abwarten**
 
-Den Einzeiler erneut ausführen. Die Mod wird unter demselben Dateinamen ersetzt und die Menüsprache erneut kopiert. Nach einem größeren Hytale-Update kann dies erneut nötig sein.
+PowerShell öffnet sich und installiert das Sprachpaket automatisch. Du siehst jeden Schritt und am Ende **„Fertig! Dein Sprachpaket ist installiert.“**
 
-Falls dasselbe Sprachpaket bereits über CurseForge oder manuell unter einem anderen ZIP-Dateinamen installiert ist, vorab die doppelte Installation entfernen. Andere Übersetzungsmods können ebenfalls Konflikte verursachen.
+Das Fenster bleibt geöffnet. Lies das Ergebnis und drücke anschließend **Enter**, um es zu schließen. Auch bei einem Fehler bleibt die Meldung sichtbar.
 
-## Hinweise
+> [!TIP]
+> Du brauchst keine Administratorrechte. Die Installation läuft automatisch. Warte bitte bis zur Abschlussmeldung.
 
-- Nur unter Windows mit PowerShell verwenden.
-- Die Installation betrifft den aktuell angemeldeten Windows-Benutzer unter `%APPDATA%\Hytale`.
-- Auf einem fremden Multiplayer-Server müssen die serverseitigen Spieltexte dort installiert sein.
-- Die Übersetzung ist ein Community-Projekt von EinfachNurTeo und keine offizielle Hytale-Veröffentlichung.
+---
+
+## 🇩🇪 Deutsch auswählen
+
+1. Starte Hytale.
+2. Öffne **Settings → Language** und wähle **Deutsch**.
+3. Aktiviere das **Deutsche Sprachpaket** für deine Spielwelt.
+
+**Auf ins nächste Abenteuer!** 🗺️
+
+---
+
+## 🔄 Erneut installieren
+
+Deutsch fehlt nach einem Hytale-Update? Schließe das Spiel und führe den Befehl oben erneut aus. Dein Sprachpaket wird wieder eingerichtet.
+
+Die hier angebotene Übersetzung ist für **Hytale 0.7** gedacht. Prüfe bei einer neuen Spielversion zuerst den Versionshinweis oben.
+
+---
+
+<a id="hilfe"></a>
+
+## ❓ Hilfe
+
+<details>
+<summary><strong>Das PowerShell-Fenster öffnet sich nicht.</strong></summary>
+
+Prüfe deine Internetverbindung und kopiere den vollständigen Befehl erneut in **Windows + R**. Warte nach dem Start einen kurzen Moment. Wird ein Fehler angezeigt, versuche es später noch einmal.
+
+</details>
+
+<details>
+<summary><strong>Die Installation meldet einen Fehler.</strong></summary>
+
+Lies die Meldung im PowerShell-Fenster. Lass Hytale geschlossen und prüfe deine Internetverbindung sowie den freien Speicherplatz. Bestätige dann mit **Enter** und führe den Befehl erneut aus.
+
+Falls du weitere Hilfe brauchst, [melde das Problem hier](https://github.com/CelduinX/Tools/issues). Nenne deine Hytale-Version und die angezeigte Meldung.
+
+</details>
+
+<details>
+<summary><strong>„Deutsch“ fehlt in der Sprachauswahl.</strong></summary>
+
+Schließe Hytale vollständig, führe die Installation erneut aus und starte das Spiel anschließend neu. Diese Installationshilfe ist für die normale Windows-Installation und Hytale 0.7 vorgesehen.
+
+</details>
+
+<details>
+<summary><strong>Die Menüs sind deutsch, aber Spieltexte bleiben englisch.</strong></summary>
+
+Prüfe, ob das **Deutsche Sprachpaket** für deine Spielwelt aktiviert ist. Zusätzliche Inhalte anderer Mods sind möglicherweise nicht übersetzt.
+
+Auf einem fremden Multiplayer-Server entscheidet dessen Sprachpaket über die serverseitigen Spieltexte. Frage bei Bedarf das Serverteam.
+
+</details>
+
+<details>
+<summary><strong>Ich habe bereits eine deutsche Übersetzung installiert.</strong></summary>
+
+Verwende möglichst nur ein deutsches Sprachpaket gleichzeitig. Entferne eine bereits über CurseForge oder manuell installierte Ausgabe desselben Pakets, bevor du diese Installationshilfe verwendest. So vermeidest du doppelte Übersetzungen und Konflikte.
+
+Wenn du diese Installationshilfe bereits verwendet hast, kannst du den Befehl einfach erneut ausführen.
+
+</details>
+
+---
+
+<a id="credits"></a>
+
+## 💛 Credits
+
+Die Übersetzung stammt von **EinfachNurTeo**: [Deutsches Sprachpaket auf CurseForge](https://www.curseforge.com/hytale/translations/deutsches-sprachpaket).
+
+Diese Installationshilfe wird von **CelduinX** bereitgestellt. Fehler in der Übersetzung kannst du direkt beim CurseForge-Projekt melden.
+
+<div align="center">
+
+*Von der Community für die Community. Keine offizielle Hytale-Veröffentlichung.*
+
+</div>
